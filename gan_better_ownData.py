@@ -1,86 +1,111 @@
 import tensorflow as tf
-from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
+from random import randint
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 
-mb_size = 32
-X_dim = 784
-z_dim = 10
-h_dim = 128
 CHANNEL = 3
 HEIGHT = 28
 WIDTH = 28
 
+X_dim = HEIGHT * WIDTH * CHANNEL
+mb_size = 32
+z_dim = 10
+h_dim = 128
+
 data_directory = "./sprites"
-filename_queue = tf.train.string_input_producer(os.listdir(data_directory))
-reader = tf.WholeFileReader()
-content, labels = reader.read(filename_queue)
-image = tf.image.decode_png(content, channels=CHANNEL)
-image = tf.image.random_flip_left_right(image)
-image = tf.image.random_brightness(image, max_delta=0.1)
-image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
+filelist = []
+for s in os.listdir(data_directory):
+    if ".png" in s:
+        filelist.append(data_directory + "/" + s)
+images = []
+for img in filelist:
+    image_contents = tf.read_file(img)
+    image = tf.image.decode_png(image_contents, channels=3)
+    image = tf.image.resize_images(image, [28, 28])
+    images.append(image)
 
-size = [HEIGHT, WIDTH]
-# we can easily resize them here using this:
-image = tf.image.resize_images(image, size)
-image.set_shape([HEIGHT, WIDTH, CHANNEL])
-image = tf.cast(image, tf.float32)
-image = image / 255.0
-print("image done")
 
-def plot(samples):
-    fig = plt.figure(figsize=(4, 4))
+def plot(samplefigs):
+    returnfig = plt.figure(figsize=(4, 4))
     gs = gridspec.GridSpec(4, 4)
     gs.update(wspace=0.05, hspace=0.05)
 
-    for i, sample in enumerate(samples):
-        ax = plt.subplot(gs[i])
+    for x, sample in enumerate(samplefigs):
+        ax = plt.subplot(gs[x])
         plt.axis('off')
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_aspect('equal')
-        plt.imshow(sample.reshape(28, 28), cmap='Greys_r')
+        plt.imshow(sample.reshape(28, 28, 3))              # TODO: is this right?
 
-    return fig
+    return returnfig
 
 
 def xavier_init(size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
     return tf.random_normal(shape=size, stddev=xavier_stddev)
-    
+
 
 def sample_z(m, n):
     return np.random.uniform(-1., 1., size=[m, n])
-    
 
-def discriminator(x, D_W1, D_W2, D_b1, D_b2):
-    D_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
-    out = tf.matmul(D_h1, D_W2) + D_b2
+
+def discriminator(x, d_w1, d_w2, d_b1, d_b2):
+    d_h1 = tf.nn.relu(tf.matmul(x, d_w1) + d_b1)
+    out = tf.matmul(d_h1, d_w2) + d_b2
     return out
-    
-    
-def conv2d(x, W):
-    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-    
+
+
+def conv2d(x, w):
+    return tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='SAME')
+
+
 def max_pool_2x2(x):
     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    
+
+
 def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1) # normalverteilung
+    initial = tf.truncated_normal(shape, stddev=0.1)  # Normalverteilung
     return tf.Variable(initial)
+
 
 def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
-    
+
+
+def next_batch(num, data):
+    # Return `num` random samples
+    randomnumbers = []
+    for _ in range(num):
+        randomnumbers.append(randint(0, len(data) - 1))
+
+    nextbatch = []
+    for ran in randomnumbers:
+        nextbatch.append(data[ran])
+
+    return nextbatch
+
+
+def getlastmodel():
+    iterat = 0
+    for st in os.listdir("./models"):
+        newstring = st
+        while "." in newstring:
+            newstring = newstring[:-1]
+        if "point" not in newstring:
+            if int(newstring[6:]) > iterat:
+                iterat = int(newstring[6:])
+
+    return "./models/model_%s.ckpt" % iterat, iterat
+
 
 with tf.name_scope('model1'):
-
     # generator variabeln
-    
+
     z = tf.placeholder(tf.float32, shape=[None, z_dim])
 
     G_W1 = tf.Variable(xavier_init([z_dim, h_dim]))
@@ -89,7 +114,7 @@ with tf.name_scope('model1'):
     G_W2 = tf.Variable(xavier_init([h_dim, X_dim]))
     G_b2 = tf.Variable(tf.zeros(shape=[X_dim]))
 
-    theta_G = [G_W1, G_W2, G_b1, G_b2]    
+    theta_G = [G_W1, G_W2, G_b1, G_b2]
 
     # discriminator variabeln
 
@@ -102,22 +127,19 @@ with tf.name_scope('model1'):
     D_b2 = tf.Variable(tf.zeros(shape=[1]))
 
     theta_D = [D_W1, D_W2, D_b1, D_b2]
-    
+
     # Generator
 
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
     G_log_prob = tf.matmul(G_h1, G_W2) + G_b2
     G_sample = tf.nn.sigmoid(G_log_prob)
 
-
     # discriminator
-   
-    D_real = discriminator(X,  D_W1, D_W2, D_b1, D_b2)
-    D_fake = discriminator(G_sample,  D_W1, D_W2, D_b1, D_b2)
 
+    D_real = discriminator(X, D_W1, D_W2, D_b1, D_b2)
+    D_fake = discriminator(G_sample, D_W1, D_W2, D_b1, D_b2)
 
 with tf.name_scope('train'):
-    print("training")
     D_loss = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
     G_loss = -tf.reduce_mean(D_fake)
 
@@ -131,35 +153,53 @@ with tf.name_scope('train'):
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 with sess.as_default():
-
+    # Create folders we're going to use:
     if not os.path.exists('out/'):
         os.makedirs('out/')
-
-    i = 0
+    if not os.path.exists("./models"):
+        os.makedirs("./models")
+    # A Saver to save our model:
+    saver = tf.train.Saver()
+    # Reloading Model:
+    model, iterationcounter = getlastmodel()
+    if len(os.listdir("./models")) > 0:
+        saver.restore(sess, model)
+        print("Model restored.",)
+        i = iterationcounter
+        print(i)
+    else:
+        iterationcounter = 0
 
     for it in range(1000000):
         for _ in range(5):
-            X_mb, _ = tf.train.batch([image, labels], batch_size=mb_size)
+            batch = next_batch(mb_size, images)
+            # Reshaping from shape: (32,#imgs,28,28,3) to (#imgs,(2352)) because 2352 = 28*28*3
+            xshape = X.get_shape().as_list()
+            dim = np.prod(xshape[1:])
+            batch_reshaped = tf.reshape(batch, [-1, dim])
+            batch_eval = sess.run(batch_reshaped)   # evaluating tensor to array
+
             _, D_loss_curr, _ = sess.run(
                 [D_solver, D_loss, clip_D],
-                feed_dict={X: X_mb.eval(), z: sample_z(mb_size, z_dim)}
+                feed_dict={X: batch_eval, z: sample_z(mb_size, z_dim)}
             )
-            print("yay")
 
         _, G_loss_curr = sess.run(
             [G_solver, G_loss],
             feed_dict={z: sample_z(mb_size, z_dim)}
         )
 
-        if it % 100 == 0:
+        if it % 100 == 0 and it != 0:
+            iterationcounter += 100
             print('Iter: {}; D loss: {:.4}; G_loss: {:.4}'
-                  .format(it, D_loss_curr, G_loss_curr))
+                  .format(str(iterationcounter), D_loss_curr, G_loss_curr))
 
-            if it % 1000 == 0:
+            if it % 100 == 0:
                 samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim)})
 
                 fig = plot(samples)
                 plt.savefig('out/{}.png'
-                            .format(str(i).zfill(3)), bbox_inches='tight')
-                i += 1
+                            .format(str(iterationcounter).zfill(3)), bbox_inches='tight')
                 plt.close(fig)
+                save_path = saver.save(sess, "./models/model_%s.ckpt" % iterationcounter)
+                print("Model saved in file: %s" % save_path)

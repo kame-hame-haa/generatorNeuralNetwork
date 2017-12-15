@@ -136,14 +136,15 @@ with tf.name_scope('model1'):
 
     D_W2 = tf.Variable(xavier_init([h_dim, 1]))
     D_b2 = tf.Variable(tf.zeros(shape=[1]))
+    
+    #drop out Layer
+    
 
     theta_D = [D_W1, D_W2, D_b1, D_b2]
 
     # Generator
 
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
-    G_log_prob = tf.matmul(G_h1, G_W2) + G_b2
-    G_sample = tf.nn.sigmoid(G_log_prob)
 
     # discriminator
 

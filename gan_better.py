@@ -42,24 +42,54 @@ def sample_z(m, n):
     
 
 def discriminator(x, D_W1, D_W2, D_b1, D_b2):
-    D_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
-    out = tf.matmul(D_h1, D_W2) + D_b2
-    return out
+    #D_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
+    x_shaped = tf.reshape(x, [-1, 28, 28, 1])
+    conv1 = create_new_conv_layer(x_shaped, 1, 32, [5, 5], [2, 2], name='cnnlayer1') #Farben auch hier aendern!
     
+    flattened = tf.reshape(conv1, [-1, 14 * 14 * 32])
     
-def conv2d(x, W):
-    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+    # setup some weights and bias values for this layer, then activate with ReLU
     
-def max_pool_2x2(x):
-    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-    
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1) #normalverteilung
-    return tf.Variable(initial)
+    dense_layer1 = tf.matmul(flattened, D_W1) + D_b1
+    dense_layer1 = tf.nn.sigmoid(dense_layer1)
 
-def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    
+    # another layer with softmax activations
+    #wd2 = tf.Variable(tf.truncated_normal([1000, 10], stddev=0.03), name='wd2')
+    #bd2 = tf.Variable(tf.truncated_normal([10], stddev=0.01), name='bd2')
+    dense_layer2 = tf.matmul(dense_layer1, D_W2) + D_b2
+    out = tf.nn.sigmoid(dense_layer2)
+
+    return out
+
+
+def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_shape, pool_shape, name):
+    # setup the filter input shape for tf.nn.conv_2d
+    conv_filt_shape = [filter_shape[0], filter_shape[1], num_input_channels,
+                      num_filters]
+
+    # initialise weights and bias for the filter
+    weights = tf.Variable(tf.truncated_normal(conv_filt_shape, stddev=0.03),
+                                      name=name+'_W')
+    bias = tf.Variable(tf.truncated_normal([num_filters]), name=name+'_b')
+
+    # setup the convolutional layer operation
+    out_layer = tf.nn.conv2d(input_data, weights, [1, 1, 1, 1], padding='SAME')
+
+    # add the bias
+    out_layer += bias
+
+    # apply a ReLU non-linear activation
+    out_layer = tf.nn.sigmoid(out_layer)
+
+    # now perform max pooling
+    ksize = [1, pool_shape[0], pool_shape[1], 1]
+    strides = [1, 2, 2, 1]
+    out_layer = tf.nn.max_pool(out_layer, ksize=ksize, strides=strides, 
+                               padding='SAME')
+
+    return out_layer    
+    
     
 
 with tf.name_scope('model1'):
@@ -80,10 +110,16 @@ with tf.name_scope('model1'):
 
     X = tf.placeholder(tf.float32, shape=[None, X_dim])
 
-    D_W1 = tf.Variable(xavier_init([X_dim, h_dim]))
-    D_b1 = tf.Variable(tf.zeros(shape=[h_dim]))
+      # wd1 = tf.Variable(tf.truncated_normal([14 * 14 * 32, 1000], stddev=0.03), name='wd1')
+      # bd1 = tf.Variable(tf.truncated_normal([1000], stddev=0.01), name='bd1')
+    D_W1 = tf.Variable(xavier_init([14*14*32, 1000]))
+    D_b1 = tf.Variable(tf.zeros(shape=[1000]))
+    
+    
+        #wd2 = tf.Variable(tf.truncated_normal([1000, 10], stddev=0.03), name='wd2')
+        #bd2 = tf.Variable(tf.truncated_normal([10], stddev=0.01), name='bd2')
 
-    D_W2 = tf.Variable(xavier_init([h_dim, 1]))
+    D_W2 = tf.Variable(xavier_init([1000, 1]))
     D_b2 = tf.Variable(tf.zeros(shape=[1]))
 
     theta_D = [D_W1, D_W2, D_b1, D_b2]
@@ -96,12 +132,9 @@ with tf.name_scope('model1'):
     G_h1Drop = tf.nn.dropout(G_h1, keepProb) #drop beim Testen und nihct 
     G_log_prob = tf.matmul(G_h1Drop, G_W2) + G_b2
         
-        #dropout Layer
+    #dropout Layer
         
-
     G_sample = tf.nn.sigmoid(G_log_prob)
-    
-    
     
     # discriminator
    

@@ -90,8 +90,13 @@ with tf.name_scope('model1'):
     #generator 
 
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
-    G_log_prob = tf.matmul(G_h1, G_W2) + G_b2
-    G_sample = tf.nn.sigmoid(G_log_prob)
+    G_log_prob = tf.nn.relu(tf.matmul(G_h1, G_W2) + G_b2)
+        
+        #dropout Layer
+        
+    G_log_probDrop = tf.nn.dropout(G_log_prob, 0.9)
+    G_sample = tf.nn.sigmoid(G_log_probDrop)
+    
     
     
     # discriminator

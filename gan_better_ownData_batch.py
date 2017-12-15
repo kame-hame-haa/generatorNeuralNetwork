@@ -19,6 +19,7 @@ filelist = []
 for s in os.listdir(data_directory):
     if ".png" in s:
         filelist.append(data_directory + "/" + s)
+ANZAHLBILDER = len(filelist)
 
 
 def data(index):
@@ -29,13 +30,6 @@ def data(index):
     image = tf.image.random_brightness(image, max_delta=0.1)
     image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
     return image
-
-# images = []
-# for img in filelist:
-#    image_contents = tf.read_file(img)
-#    image = tf.image.decode_png(image_contents, channels=3)
-#    image = tf.image.resize_images(image, [28, 28])
-#   images.append(image)
 
 
 def plot(samplefigs):
@@ -92,13 +86,14 @@ def next_batch(num):
     # Return `num` random samples
     randomnumbers = []
     for _ in range(num):
-        randomnumbers.append(randint(0, len(filelist) - 1))
+        randomnumbers.append(randint(0, ANZAHLBILDER - 1))
 
     nextbatch = []
     for ran in randomnumbers:
         nextbatch.append(data(ran))
 
-    return nextbatch
+    # Reshaping from shape: (32,#imgs,28,28,3) to (#imgs,(2352)) because 2352 = 28*28*3
+    return tf.reshape(nextbatch, [-1, X_dim])
 
 
 def getlastmodel():
@@ -129,26 +124,27 @@ with tf.name_scope('model1'):
 
     # discriminator variabeln
 
-    X = tf.placeholder(tf.float32, shape=[None, X_dim])
-
     D_W1 = tf.Variable(xavier_init([X_dim, h_dim]))
     D_b1 = tf.Variable(tf.zeros(shape=[h_dim]))
 
     D_W2 = tf.Variable(xavier_init([h_dim, 1]))
     D_b2 = tf.Variable(tf.zeros(shape=[1]))
-    
-    #drop out Layer
-    
 
     theta_D = [D_W1, D_W2, D_b1, D_b2]
+    # generator
 
-    # Generator
-
+    keepProb = tf.placeholder(tf.float32)
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
+    G_h1Drop = tf.nn.dropout(G_h1, keepProb)  # drop beim Testen und nihct
+    G_log_prob = tf.matmul(G_h1Drop, G_W2) + G_b2
+
+    # dropout Layer
+
+    G_sample = tf.nn.sigmoid(G_log_prob)
 
     # discriminator
 
-    D_real = discriminator(X, D_W1, D_W2, D_b1, D_b2)
+    D_real = discriminator(next_batch(mb_size), D_W1, D_W2, D_b1, D_b2)
     D_fake = discriminator(G_sample, D_W1, D_W2, D_b1, D_b2)
 
 with tf.name_scope('train'):
@@ -184,23 +180,15 @@ with sess.as_default():
 
     for it in range(1000000):
         for _ in range(5):
-            batch = next_batch(mb_size)
-            # Reshaping from shape: (32,#imgs,28,28,3) to (#imgs,(2352)) because 2352 = 28*28*3
-            xshape = X.get_shape().as_list()
-            dim = np.prod(xshape[1:])
-            batch_reshaped = tf.reshape(batch, [-1, dim])
-            batch_eval = sess.run(batch_reshaped)   # evaluating tensor to array
-
             _, D_loss_curr, _ = sess.run(
                 [D_solver, D_loss, clip_D],
-                feed_dict={X: batch_eval, z: sample_z(mb_size, z_dim)}
+                feed_dict={z: sample_z(mb_size, z_dim), keepProb: 0.5}
             )
 
         _, G_loss_curr = sess.run(
             [G_solver, G_loss],
-            feed_dict={z: sample_z(mb_size, z_dim)}
+            feed_dict={z: sample_z(mb_size, z_dim), keepProb: 0.5}
         )
-        print(it)
 
         if it % 100 == 0 and it != 0:
             iterationcounter += 100
@@ -208,7 +196,7 @@ with sess.as_default():
                   .format(str(iterationcounter), D_loss_curr, G_loss_curr))
 
             if it % 100 == 0:
-                samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim)})
+                samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim), keepProb: 1.0})
 
                 fig = plot(samples)
                 plt.savefig('out/{}.png'

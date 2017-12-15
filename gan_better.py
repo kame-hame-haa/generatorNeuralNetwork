@@ -86,7 +86,7 @@ def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_sh
     out_layer += bias
 
     # apply a ReLU non-linear activation
-    out_layer = tf.nn.lrelu(out_layer, alplr)
+    out_layer = lrelu(out_layer, alplr)
 
     # now perform max pooling
     ksize = [1, pool_shape[0], pool_shape[1], 1]

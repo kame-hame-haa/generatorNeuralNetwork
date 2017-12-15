@@ -180,7 +180,7 @@ for it in range(1000000):
         print('Iter: {}; D loss: {:.4}; G_loss: {:.4}'
               .format(it, D_loss_curr, G_loss_curr))
 
-        if it % 1000 == 0:
+        if it % 500 == 0:
             samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim), keepProb: 1.0})
             #print(samples)
 

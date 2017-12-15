@@ -10,6 +10,7 @@ mb_size = 32
 X_dim = 784
 z_dim = 10
 h_dim = 128
+dropoutRate = 0.5
 
 mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
 
@@ -90,12 +91,13 @@ with tf.name_scope('model1'):
     #generator 
 
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
-    G_log_prob = tf.nn.relu(tf.matmul(G_h1, G_W2) + G_b2)
+    G_h1Drop = tf.nn.dropout(G_h1, dropoutRate) #drop beim Testen und nihct Testen
+    G_log_prob = tf.matmul(G_h1Drop, G_W2) + G_b2
         
         #dropout Layer
         
-    G_log_probDrop = tf.nn.dropout(G_log_prob, 0.9)
-    G_sample = tf.nn.sigmoid(G_log_probDrop)
+
+    G_sample = tf.nn.sigmoid(G_log_prob)
     
     
     
@@ -145,6 +147,7 @@ for it in range(1000000):
 
         if it % 1000 == 0:
             samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim)})
+            #print(samples)
 
             fig = plot(samples)
             plt.savefig('out/{}.png'

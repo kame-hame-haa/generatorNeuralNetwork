@@ -10,7 +10,7 @@ mb_size = 32
 X_dim = 784
 z_dim = 10
 h_dim = 128
-dropoutRate = 0.5
+dropoutRate = 0.7
 
 mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
 
@@ -89,9 +89,11 @@ with tf.name_scope('model1'):
     theta_D = [D_W1, D_W2, D_b1, D_b2]
     
     #generator 
+    
 
+    keepProb = tf.placeholder(tf.float32)
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
-    G_h1Drop = tf.nn.dropout(G_h1, dropoutRate) #drop beim Testen und nihct Testen
+    G_h1Drop = tf.nn.dropout(G_h1, keepProb) #drop beim Testen und nihct 
     G_log_prob = tf.matmul(G_h1Drop, G_W2) + G_b2
         
         #dropout Layer
@@ -133,12 +135,12 @@ for it in range(1000000):
 
         _, D_loss_curr, _ = sess.run(
             [D_solver, D_loss, clip_D],
-            feed_dict={X: X_mb, z: sample_z(mb_size, z_dim)}
+            feed_dict={X: X_mb, z: sample_z(mb_size, z_dim), keepProb: 1.0}
         )
 
     _, G_loss_curr = sess.run(
         [G_solver, G_loss],
-        feed_dict={z: sample_z(mb_size, z_dim)}
+        feed_dict={z: sample_z(mb_size, z_dim), keepProb: 1.0}
     )
 
     if it % 100 == 0:
@@ -146,7 +148,7 @@ for it in range(1000000):
               .format(it, D_loss_curr, G_loss_curr))
 
         if it % 1000 == 0:
-            samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim)})
+            samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim), keepProb: 1.0})
             #print(samples)
 
             fig = plot(samples)

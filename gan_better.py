@@ -11,8 +11,14 @@ X_dim = 784
 z_dim = 10
 h_dim = 128
 dropoutRate = 0.7
+alplr = 0.2
 
 mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
+
+
+# leaky Relu
+def lrelu(x, alpha):
+    return tf.nn.relu(x) - alpha * tf.nn.relu(-x)
 
 
 def plot(samples):
@@ -52,14 +58,14 @@ def discriminator(x, D_W1, D_W2, D_b1, D_b2):
     # setup some weights and bias values for this layer, then activate with sigmod
     
     dense_layer1 = tf.matmul(flattened, D_W1) + D_b1
-    dense_layer1 = tf.nn.sigmoid(dense_layer1)
+    dense_layer1 = lrelu(dense_layer1, alplr)
 
     
     # another layer with softmax activations
     #wd2 = tf.Variable(tf.truncated_normal([1000, 10], stddev=0.03), name='wd2')
     #bd2 = tf.Variable(tf.truncated_normal([10], stddev=0.01), name='bd2')
     dense_layer2 = tf.matmul(dense_layer1, D_W2) + D_b2
-    out = tf.nn.sigmoid(dense_layer2)
+    out = lrelu(dense_layer2, alplr)
 
     return out
 
@@ -81,7 +87,9 @@ def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_sh
     conv1 += bias
 
     # apply a ReLU non-linear activation
-    conv1 = tf.nn.sigmoid(conv1)
+
+    out_layer = lrelu(out_layer, alplr)
+
 
     # now perform max pooling
    # ksize = [1, pool_shape[0], pool_shape[1], 1]
@@ -133,7 +141,7 @@ with tf.name_scope('model1'):
     
 
     keepProb = tf.placeholder(tf.float32)
-    G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
+    G_h1 = lrelu(tf.matmul(z, G_W1) + G_b1, alplr)
     G_h1Drop = tf.nn.dropout(G_h1, keepProb) #drop beim Testen und nihct 
     G_log_prob = tf.matmul(G_h1Drop, G_W2) + G_b2
         
@@ -185,7 +193,7 @@ for it in range(1000000):
         print('Iter: {}; D loss: {:.4}; G_loss: {:.4}'
               .format(it, D_loss_curr, G_loss_curr))
 
-        if it % 1000 == 0:
+        if it % 500 == 0:
             samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim), keepProb: 1.0})
             #print(samples)
 

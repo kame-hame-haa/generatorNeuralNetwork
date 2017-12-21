@@ -46,9 +46,10 @@ def discriminator(x, D_W1, D_W2, D_b1, D_b2):
     x_shaped = tf.reshape(x, [-1, 28, 28, 1])
     conv1 = create_new_conv_layer(x_shaped, 1, 32, [5, 5], [2, 2], name='cnnlayer1') #Farben auch hier aendern!
     
+    
     flattened = tf.reshape(conv1, [-1, 14 * 14 * 32])
     
-    # setup some weights and bias values for this layer, then activate with ReLU
+    # setup some weights and bias values for this layer, then activate with sigmod
     
     dense_layer1 = tf.matmul(flattened, D_W1) + D_b1
     dense_layer1 = tf.nn.sigmoid(dense_layer1)
@@ -62,8 +63,8 @@ def discriminator(x, D_W1, D_W2, D_b1, D_b2):
 
     return out
 
-
-def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_shape, pool_shape, name):
+# strip reducing without meaning
+def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_shape, stripe, name):
     # setup the filter input shape for tf.nn.conv_2d
     conv_filt_shape = [filter_shape[0], filter_shape[1], num_input_channels,
                       num_filters]
@@ -74,21 +75,25 @@ def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_sh
     bias = tf.Variable(tf.truncated_normal([num_filters]), name=name+'_b')
 
     # setup the convolutional layer operation
-    out_layer = tf.nn.conv2d(input_data, weights, [1, 1, 1, 1], padding='SAME')
+    conv1 = tf.nn.conv2d(input_data, weights, [1, stripe[0], stripe[1], 1], padding='SAME')
 
     # add the bias
-    out_layer += bias
+    conv1 += bias
 
     # apply a ReLU non-linear activation
-    out_layer = tf.nn.sigmoid(out_layer)
+    conv1 = tf.nn.sigmoid(conv1)
 
     # now perform max pooling
-    ksize = [1, pool_shape[0], pool_shape[1], 1]
-    strides = [1, 2, 2, 1]
-    out_layer = tf.nn.max_pool(out_layer, ksize=ksize, strides=strides, 
-                               padding='SAME')
+   # ksize = [1, pool_shape[0], pool_shape[1], 1]
+    #strides = [1, 2, 2, 1]
+   # out_layer = tf.nn.max_pool(out_layer, ksize=ksize, strides=strides, 
+                              # padding='SAME')
+                               
+   # reducing_layer_shape = [stripe_reducing_shape[0], stripe_reducing_shape[1], 32, 1]
+                               
+   # out_layer = tf.nn.conv2d(conv1, weights, [1, 1, 1, 1], padding='SAME')
 
-    return out_layer    
+    return conv1    
     
     
 

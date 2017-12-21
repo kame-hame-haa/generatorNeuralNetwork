@@ -88,7 +88,7 @@ def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_sh
 
     # apply a ReLU non-linear activation
 
-    out_layer = lrelu(out_layer, alplr)
+    conv1 = lrelu(conv1, alplr)
 
 
     # now perform max pooling

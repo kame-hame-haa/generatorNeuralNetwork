@@ -14,7 +14,7 @@ dropoutRate = 0.7
 alplr = 0.2
 
 
-NUMBER_1CNN = 64
+NUMBER_1CNN = 64 # Anzahl des Outputs
 
 mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
 
@@ -39,7 +39,7 @@ def plot(samples):
 
     return fig
 
-
+# normalisiert erstellte Matrizen; besser als 0 - Matrizen
 def xavier_init(size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
@@ -53,20 +53,17 @@ def sample_z(m, n):
 def discriminator(x, D_W1, D_W2, D_b1, D_b2):
     #D_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
     x_shaped = tf.reshape(x, [-1, 28, 28, 1])
-    conv1 = create_new_conv_layer(x_shaped, 1, NUMBER_1CNN, [5, 5], [2, 2], name='cnnlayer1') #Farben auch hier aendern!
+    conv1 = create_new_conv_layer(x_shaped, 1, NUMBER_1CNN, [5, 5], [2, 2], name='cnnlayer1') # Stride [2, 2] sorgt für Halbierung des Outputs 28 -> 14
     
     
     flattened = tf.reshape(conv1, [-1, 14 * 14 * NUMBER_1CNN])
     
     # setup some weights and bias values for this layer, then activate with sigmod
-    
+    # fasst Output von CNN zusammen
     dense_layer1 = tf.matmul(flattened, D_W1) + D_b1
     dense_layer1 = lrelu(dense_layer1, alplr)
 
-    
-    # another layer with softmax activations
-    #wd2 = tf.Variable(tf.truncated_normal([1000, 10], stddev=0.03), name='wd2')
-    #bd2 = tf.Variable(tf.truncated_normal([10], stddev=0.01), name='bd2')
+
     dense_layer2 = tf.matmul(dense_layer1, D_W2) + D_b2
     out = lrelu(dense_layer2, alplr)
 
@@ -92,16 +89,6 @@ def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_sh
 
     conv1 = lrelu(conv1, alplr)
 
-
-    # now perform max pooling
-   # ksize = [1, pool_shape[0], pool_shape[1], 1]
-    #strides = [1, 2, 2, 1]
-   # out_layer = tf.nn.max_pool(out_layer, ksize=ksize, strides=strides, 
-                              # padding='SAME')
-                               
-   # reducing_layer_shape = [stripe_reducing_shape[0], stripe_reducing_shape[1], 32, 1]
-                               
-   # out_layer = tf.nn.conv2d(conv1, weights, [1, 1, 1, 1], padding='SAME')
 
     return conv1    
     

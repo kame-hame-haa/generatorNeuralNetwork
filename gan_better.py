@@ -13,6 +13,9 @@ h_dim = 128
 dropoutRate = 0.7
 alplr = 0.2
 
+
+NUMBER_1CNN = 64
+
 mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
 
 
@@ -50,10 +53,10 @@ def sample_z(m, n):
 def discriminator(x, D_W1, D_W2, D_b1, D_b2):
     #D_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
     x_shaped = tf.reshape(x, [-1, 28, 28, 1])
-    conv1 = create_new_conv_layer(x_shaped, 1, 32, [5, 5], [2, 2], name='cnnlayer1') #Farben auch hier aendern!
+    conv1 = create_new_conv_layer(x_shaped, 1, NUMBER_1CNN, [5, 5], [2, 2], name='cnnlayer1') #Farben auch hier aendern!
     
     
-    flattened = tf.reshape(conv1, [-1, 14 * 14 * 32])
+    flattened = tf.reshape(conv1, [-1, 14 * 14 * NUMBER_1CNN])
     
     # setup some weights and bias values for this layer, then activate with sigmod
     
@@ -69,7 +72,6 @@ def discriminator(x, D_W1, D_W2, D_b1, D_b2):
 
     return out
 
-# strip reducing without meaning
 def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_shape, stripe, name):
     # setup the filter input shape for tf.nn.conv_2d
     conv_filt_shape = [filter_shape[0], filter_shape[1], num_input_channels,
@@ -125,7 +127,7 @@ with tf.name_scope('model1'):
 
       # wd1 = tf.Variable(tf.truncated_normal([14 * 14 * 32, 1000], stddev=0.03), name='wd1')
       # bd1 = tf.Variable(tf.truncated_normal([1000], stddev=0.01), name='bd1')
-    D_W1 = tf.Variable(xavier_init([14*14*32, 1000]))
+    D_W1 = tf.Variable(xavier_init([14*14*NUMBER_1CNN, 1000]))
     D_b1 = tf.Variable(tf.zeros(shape=[1000]))
     
     
@@ -193,7 +195,7 @@ for it in range(1000000):
         print('Iter: {}; D loss: {:.4}; G_loss: {:.4}'
               .format(it, D_loss_curr, G_loss_curr))
 
-        if it % 500 == 0:
+        if it % 00 == 0:
             samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim), keepProb: 1.0})
             #print(samples)
 

@@ -1,16 +1,13 @@
 import tensorflow as tf
-from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 from random import randint
 
-
 mb_size = 32
 dropoutRate = 0.7
 alplr = 0.2
-
 
 CHANNEL = 3
 HEIGHT = 28
@@ -41,7 +38,7 @@ def data(index):
     image = tf.image.random_brightness(image, max_delta=0.1)
     image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
     image = tf.cast(image, tf.float32)
-    image = image/255.0
+    image = image / 255.0
     return image
 
 
@@ -51,9 +48,10 @@ for i in range(16):
 
 current = 0
 
+
 def plot(samples):
-    fig = plt.figure(figsize=(4, 4))
-    gs = gridspec.GridSpec(4, 4)
+    fig = plt.figure(figsize=(40, 40))
+    gs = gridspec.GridSpec(5, 16)
     gs.update(wspace=0.05, hspace=0.05)
 
     for i, sample in enumerate(samples):
@@ -72,7 +70,7 @@ def xavier_init(size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
     return tf.random_normal(shape=size, stddev=xavier_stddev)
-    
+
 
 def sample_z(m, n):
     return np.random.uniform(-1., 1., size=[m, n])
@@ -81,6 +79,7 @@ def sample_z(m, n):
 samples_z = []
 for i in range(16):
     samples_z.append(sample_z(1, z_dim))
+
 
 # leaky Relu
 
@@ -114,10 +113,9 @@ def getlastmodel():
                 iterat = int(newstring[6:])
 
     return "./modelsG/model_%s.ckpt" % iterat, iterat
-    
+
 
 with tf.name_scope('model1'):
-
     # generator variabeln
 
     z = tf.placeholder(tf.float32, shape=[None, z_dim])
@@ -134,6 +132,7 @@ with tf.name_scope('model1'):
 
     keepProb = tf.placeholder(tf.float32)
 
+
     def g_sample(i):
         vector = tf.cast(samples_z[i], tf.float32)
         g_h1 = lrelu(tf.matmul(vector, G_W1) + G_b1, alplr)
@@ -144,15 +143,19 @@ with tf.name_scope('model1'):
 
         return tf.nn.sigmoid(g_log_prob)
 
-
 with tf.name_scope('train'):
-
     G_loss = []
     for i in range(16):
-        G_loss.append(tf.square(image16[i]-g_sample(i)))
+        G_loss.append(tf.square(image16[i] - g_sample(i)))
     G_loss = tf.reduce_sum(G_loss)
 
     G_solver = (tf.train.AdamOptimizer().minimize(G_loss))
+
+
+def morph(first, second, samplesList):
+    for i in range(16):
+        morphVector = (g_sample(first) * i / 15 + g_sample(second) * (1 - i / 15))
+        samplesList.append(sess.run(morphVector, feed_dict={keepProb: 1.0}))
 
 
 sess = tf.Session()
@@ -169,12 +172,11 @@ with sess.as_default():
     model, iterationcounter = getlastmodel()
     if len(os.listdir("./modelsG")) > 0:
         saver.restore(sess, model)
-        print("Model restored.",)
+        print("Model restored.", )
         i = iterationcounter
         print(i)
     else:
         iterationcounter = 0
-
 
 i = 0
 
@@ -189,12 +191,15 @@ for it in range(1000000):
         iterationcounter += 100
         print('Iter: {};  G_loss: {:.4}'.format(str(iterationcounter), G_loss_curr))
         samples = []
-        for i in range(16):
-            samples.append(sess.run(g_sample(i)[0], feed_dict={keepProb: 1.0}))
+        morph(3, 4, samples)
+        morph(1, 7, samples)
+        morph(8, 9, samples)
+        morph(10, 13, samples)
+        morph(14, 15, samples)
 
         fig = plot(samples)
         plt.savefig('outG/{}.png'.format(str(iterationcounter).zfill(3)), bbox_inches='tight')
         plt.close(fig)
-    #if it % 1000 == 0:
-            #save_path = saver.save(sess, "./modelsG/model_%s.ckpt" % iterationcounter)
-            # print("Model saved in file: %s" % save_path)
+        # if it % 1000 == 0:
+        # save_path = saver.save(sess, "./modelsG/model_%s.ckpt" % iterationcounter)
+        # print("Model saved in file: %s" % save_path)

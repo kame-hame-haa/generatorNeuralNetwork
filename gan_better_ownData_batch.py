@@ -24,8 +24,8 @@ ANZAHLBILDER = len(filelist)
 
 def data(index):
     image_contents = tf.read_file(filelist[index])
-    image = tf.image.decode_png(image_contents, channels=3)
-    image = tf.image.resize_images(image, [28, 28])
+    image = tf.image.decode_png(image_contents, channels=CHANNEL)
+    image = tf.image.resize_images(image, [WIDTH, HEIGHT])
     image = tf.image.random_flip_left_right(image)
     image = tf.image.random_brightness(image, max_delta=0.1)
     image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
@@ -43,7 +43,8 @@ def plot(samplefigs):
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_aspect('equal')
-        plt.imshow(sample.reshape(28, 28, 3))              # TODO: is this right?
+        plt.imshow(sample.reshape(WIDTH, HEIGHT, CHANNEL))
+        #plt.imshow(sample.reshape(WIDTH, HEIGHT), cmap='Greys_r')              # TODO: is this right?
 
     return returnfig
 

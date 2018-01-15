@@ -4,16 +4,15 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 
-CHANNEL = 3 #1 bei grauer Farbe
-HEIGHT = 28
-WIDTH = 28
+CHANNEL = 3  # 1 bei grauer Farbe
+HEIGHT = 64
+WIDTH = 64
 batch_size = 32
 image_dim = HEIGHT * WIDTH * CHANNEL
-z_dim = 10
+z_dim = 100
 h_dim = 128
 
-data_directory = "./all"
-
+data_directory = "./ourDataset/all"
 
 # Reading in the pictures
 def process_data():
@@ -46,6 +45,7 @@ def process_data():
 
     return images_batch, num_images
 
+
 # drawing the generated images
 def plot(samples):
     fig = plt.figure(figsize=(4, 4))
@@ -65,28 +65,70 @@ def plot(samples):
 
     return fig
 
+
 # normalisiert erstellte Matrizen; besser als 0 - Matrizen
-#vermeidet das die Matrix mit null initialisiert wird und macht eine Normalverteilung
+# vermeidet das die Matrix mit null initialisiert wird und macht eine Normalverteilung
 def xavier_init(size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
     return tf.random_normal(shape=size, stddev=xavier_stddev)
 
+
 # Input for the Generator
 def sample_z(m, n):
     return np.random.uniform(-1., 1., size=[m, n])
 
+
+# leaky Relu
+def lrelu(x, n, leak=0.2):
+    return tf.maximum(x, leak * x, name=n)
+
+
 # The discriminator
-def discriminator(x):
-    x = tf.reshape(x,[-1,image_dim])
-    d_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
-    out = tf.matmul(d_h1, D_W2) + D_b2
-    return out
+def discriminator(input, is_train, reuse=False):
+    c2, c4, c8, c16 = 32, 64, 128, 256  # channel num: 64, 128, 256, 512
+    with tf.variable_scope('dis') as scope:
+        if reuse:
+            scope.reuse_variables()
+
+        #Reshape
+        input = tf.reshape(input,[-1,WIDTH,HEIGHT,CHANNEL])
+        # Convolution, activation, bias, repeat!
+        conv1 = tf.layers.conv2d(input, c2, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
+                                 kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
+                                 name='conv1')
+        bn1 = tf.contrib.layers.batch_norm(conv1, is_training=is_train, epsilon=1e-5, decay=0.9,
+                                           updates_collections=None, scope='bn1')
+        act1 = lrelu(conv1, n='act1')
+        # Convolution, activation, bias, repeat!
+        conv2 = tf.layers.conv2d(act1, c4, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
+                                 kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
+                                 name='conv2')
+        bn2 = tf.contrib.layers.batch_norm(conv2, is_training=is_train, epsilon=1e-5, decay=0.9,
+                                           updates_collections=None, scope='bn2')
+        act2 = lrelu(bn2, n='act2')
+
+        # start from act4
+        dim = int(np.prod(act2.get_shape()[1:]))
+        fc1 = tf.reshape(act2, shape=[-1, dim], name='fc1')
+
+        w2 = tf.get_variable('w2', shape=[fc1.shape[-1], 1], dtype=tf.float32,
+                             initializer=tf.truncated_normal_initializer(stddev=0.02))
+        b2 = tf.get_variable('b2', shape=[1], dtype=tf.float32,
+                             initializer=tf.constant_initializer(0.0))
+
+        # wgan just get rid of the sigmoid
+        logits = tf.add(tf.matmul(fc1, w2), b2, name='logits')
+        # dcgan
+        acted_out = tf.nn.sigmoid(logits)
+        return logits  # , acted_out
+
 
 # Initialize weights
 def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev=0.1)  # normalverteilung
     return tf.Variable(initial)
+
 
 # initialize biases
 def bias_variable(shape):
@@ -107,54 +149,50 @@ with tf.name_scope('model1'):
 
     theta_G = [G_W1, G_W2, G_b1, G_b2]
 
-    # discriminator variabeln
 
-    real_images = tf.placeholder(tf.float32, shape = [None, HEIGHT, WIDTH, CHANNEL], name='real_image')
-
-    D_W1 = tf.Variable(xavier_init([image_dim, h_dim]))
-    D_b1 = tf.Variable(tf.zeros(shape=[h_dim]))
-
-    D_W2 = tf.Variable(xavier_init([h_dim, 1]))
-    D_b2 = tf.Variable(tf.zeros(shape=[1]))
-
-    theta_D = [D_W1, D_W2, D_b1, D_b2]
+    real_images = tf.placeholder(tf.float32, shape=[None, HEIGHT, WIDTH, CHANNEL], name='real_image')
 
     # generator
-
     G_h1 = tf.nn.relu(tf.matmul(z, G_W1) + G_b1)
     G_log_prob = tf.matmul(G_h1, G_W2) + G_b2
     G_sample = tf.nn.sigmoid(G_log_prob)
 
-    # discriminator
 
-    D_real = discriminator(real_images)
-    D_fake = discriminator(G_sample)
+    # discriminator
+    D_real = discriminator(real_images, True)
+    D_fake = discriminator(G_sample, True, reuse=True)
+
 
 with tf.name_scope('train'):
+    # Loss function
     D_loss = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
     G_loss = -tf.reduce_mean(D_fake)
 
-    D_solver = (tf.train.RMSPropOptimizer(learning_rate=1e-4)
-                .minimize(-D_loss, var_list=theta_D))
+    # discriminator variabeln
+    t_vars = tf.trainable_variables()
+    d_vars = [var for var in t_vars if 'dis' in var.name]
+
+    D_solver = (tf.train.RMSPropOptimizer(learning_rate=2e-4)
+                .minimize(-D_loss, var_list=d_vars))
     G_solver = (tf.train.RMSPropOptimizer(learning_rate=1e-4)
                 .minimize(G_loss, var_list=theta_G))
 
-    clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in theta_D]
-
+    clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in d_vars]
 
 
 # Load saved model
 def getlastmodel():
-    iterat = 0     # Initialize the iteration we are at with 0
+    iterat = 0  # Initialize the iteration we are at with 0
     for st in os.listdir("./models"):
         newstring = st
         while "." in newstring:
             newstring = newstring[:-1]
         if "point" not in newstring:
             if int(newstring[6:]) > iterat:
-                iterat = int(newstring[6:]) 	# set the number after "model_" as our iteration
+                iterat = int(newstring[6:])  # set the number after "model_" as our iteration
 
     return "./models/model_%s.ckpt" % iterat, iterat
+
 
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
@@ -170,7 +208,7 @@ with sess.as_default():
     model, iterationcounter = getlastmodel()
     if len(os.listdir("./models")) > 0:
         saver.restore(sess, model)
-        print("Model restored.",)
+        print("Model restored.")
         i = iterationcounter
         print(i)
     else:
@@ -181,7 +219,6 @@ image_batch, samples_num = process_data()
 print(samples_num)
 coord = tf.train.Coordinator()
 threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
 
 # The main loop:
 for it in range(10000000):
@@ -201,10 +238,9 @@ for it in range(10000000):
         feed_dict={z: sample_z(batch_size, z_dim)}
     )
 
-
     if it % 100 == 0 and it != 0:
         iterationcounter += 100
-        #Print current Loss
+        # Print current Loss
         print('Iter: {}; D_loss: {:.4}; G_loss: {:.4}'.format(iterationcounter, D_loss_curr, G_loss_curr))
 
         if it % 1000 == 0:
@@ -214,6 +250,6 @@ for it in range(10000000):
             plt.savefig('out/{}.png'.format(str(iterationcounter).zfill(3)), bbox_inches='tight')
             plt.close(fig)
 
-            #Save Model
+            # Save Model
             save_path = saver.save(sess, "./models/model_%s.ckpt" % iterationcounter)
             print("Model saved in file: %s" % save_path)

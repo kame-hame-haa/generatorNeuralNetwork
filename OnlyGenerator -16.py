@@ -33,10 +33,10 @@ def data(index):
     image_contents = tf.read_file(filelist[index])
     print(filelist[index])
     image = tf.image.decode_png(image_contents, channels=3)
-    image = tf.image.resize_images(image, [28, 28])
-    image = tf.image.random_flip_left_right(image)
-    image = tf.image.random_brightness(image, max_delta=0.1)
-    image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
+    image = tf.image.resize_images(image, [WIDTH, HEIGHT])
+    #image = tf.image.random_flip_left_right(image)
+    #image = tf.image.random_brightness(image, max_delta=0.1)
+    #image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
     image = tf.cast(image, tf.float32)
     image = image / 255.0
     return image
@@ -60,7 +60,7 @@ def plot(samples):
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_aspect('equal')
-        plt.imshow(sample.reshape(28, 28, 3))
+        plt.imshow(sample.reshape(WIDTH, HEIGHT, CHANNEL))
 
     return fig
 

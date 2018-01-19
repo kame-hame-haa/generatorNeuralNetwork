@@ -86,7 +86,7 @@ def lrelu(x, n, leak=0.2):
 
 # The discriminator
 def discriminator(input, is_train, reuse=False):
-    c2, c4, c8, c16 = 32, 64, 128, 256  # channel num: 64, 128, 256, 512
+    c2, c4, c8, c16 = 64, 128, 256, 512  # channel num: 64, 128, 256, 512
     with tf.variable_scope('dis') as scope:
         if reuse:
             scope.reuse_variables()

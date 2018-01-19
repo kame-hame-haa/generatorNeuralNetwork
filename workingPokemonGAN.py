@@ -5,8 +5,8 @@ import matplotlib.gridspec as gridspec
 import os
 
 CHANNEL = 3  # 1 bei grauer Farbe
-HEIGHT = 64
-WIDTH = 64
+HEIGHT = 28
+WIDTH = 28
 batch_size = 32
 image_dim = HEIGHT * WIDTH * CHANNEL
 z_dim = 100
@@ -27,9 +27,9 @@ def process_data():
 
     content = tf.read_file(images_queue[0])
     image = tf.image.decode_jpeg(content, channels=CHANNEL)
-    image = tf.image.random_flip_left_right(image)
-    image = tf.image.random_brightness(image, max_delta=0.1)
-    image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
+    #image = tf.image.random_flip_left_right(image)
+    #image = tf.image.random_brightness(image, max_delta=0.1)
+    #image = tf.image.random_contrast(image, lower=0.9, upper=1.1)
     size = [HEIGHT, WIDTH]
     image = tf.image.resize_images(image, size)
     image.set_shape([HEIGHT, WIDTH, CHANNEL])

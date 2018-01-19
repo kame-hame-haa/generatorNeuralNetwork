@@ -5,14 +5,16 @@ import matplotlib.gridspec as gridspec
 import os
 
 CHANNEL = 3 #1 bei grauer Farbe
-HEIGHT = 28
-WIDTH = 28
+HEIGHT = 64
+WIDTH = 64
 batch_size = 32
 image_dim = HEIGHT * WIDTH * CHANNEL
-z_dim = 10
-h_dim = 128
+z_dim  = 100
+h_dim  = 128
+h2_dim = 256
+h3_dim = 512
 
-data_directory = "./all"
+data_directory = "./ourDataset/all"
 
 
 # Reading in the pictures
@@ -80,7 +82,9 @@ def sample_z(m, n):
 def discriminator(x):
     x = tf.reshape(x,[-1,image_dim])
     d_h1 = tf.nn.relu(tf.matmul(x, D_W1) + D_b1)
-    out = tf.matmul(d_h1, D_W2) + D_b2
+    d_h2 = tf.nn.relu(tf.matmul(d_h1, D_W2) + D_b2)
+    d_h3 = tf.nn.relu(tf.matmul(d_h2, D_W3) + D_b3)
+    out = tf.matmul(d_h3, D_W4) + D_b4
     return out
 
 # Initialize weights
@@ -114,10 +118,16 @@ with tf.name_scope('model1'):
     D_W1 = tf.Variable(xavier_init([image_dim, h_dim]))
     D_b1 = tf.Variable(tf.zeros(shape=[h_dim]))
 
-    D_W2 = tf.Variable(xavier_init([h_dim, 1]))
-    D_b2 = tf.Variable(tf.zeros(shape=[1]))
+    D_W2 = tf.Variable(xavier_init([h_dim, h2_dim]))
+    D_b2 = tf.Variable(tf.zeros(shape=[h2_dim]))
 
-    theta_D = [D_W1, D_W2, D_b1, D_b2]
+    D_W3 = tf.Variable(xavier_init([h2_dim, h3_dim]))
+    D_b3 = tf.Variable(tf.zeros(shape=[h3_dim]))
+
+    D_W4 = tf.Variable(xavier_init([h3_dim, 1]))
+    D_b4 = tf.Variable(tf.zeros(shape=[1]))
+
+    theta_D = [D_W1, D_W2, D_W3, D_W4, D_b1, D_b2, D_b3, D_b4]
 
     # generator
 

@@ -231,6 +231,8 @@ image_batch, samples_num = process_data()
 print(samples_num)
 coord = tf.train.Coordinator()
 threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+train_writer = tf.summary.FileWriter( './logs/1/train ', sess.graph)
+
 
 # The main loop:
 for it in range(10000000):
@@ -243,12 +245,14 @@ for it in range(10000000):
             [D_solver, D_loss, clip_D],
             feed_dict={real_images: train_image, rand_input: noise(batch_size, noise_dim)}
         )
-
+        tf.summary.histogram("D_loss", D_loss_curr)
+    
     # G
     _, G_loss_curr = sess.run(
         [G_solver, G_loss],
         feed_dict={rand_input: noise(batch_size, noise_dim)}
     )
+    tf.summary.histogram("G_loss", G_loss_curr)
 
     if it % 100 == 0 and it != 0:
         iterationcounter += 100

@@ -226,6 +226,7 @@ with sess.as_default():
         print(iterationcounter)
     else:
         iterationcounter = 0
+    baseit = iterationcounter
 
 # Initialise batch, coordinator and thread that feed the session with the images
 image_batch, samples_num = process_data()
@@ -247,7 +248,7 @@ for it in range(10000000):
             [D_solver, D_loss, tfb_merged],
             feed_dict={real_images: train_image, rand_input: noise(batch_size, noise_dim)}
         )
-        train_writer.add_summary(summary, iterationcounter)
+        train_writer.add_summary(summary, baseit + it)
         
 
     # G
@@ -255,7 +256,7 @@ for it in range(10000000):
         [G_solver, G_loss],
         feed_dict={rand_input: noise(batch_size, noise_dim)}
     )
-    train_writer.add_summary(summary, it)
+    train_writer.add_summary(summary, it + baseit)
 
     if it % 100 == 0 and it != 0:
         iterationcounter += 100

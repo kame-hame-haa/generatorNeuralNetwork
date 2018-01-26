@@ -237,7 +237,7 @@ train_writer = tf.summary.FileWriter('log/', sess.graph)
 
 # The main loop:
 for it in range(10000000):
-    print("It: " + str(it))
+    
     # Train Discriminator five times as much as the Generator
     for _ in range(5):
         train_image = sess.run(image_batch)
@@ -247,7 +247,7 @@ for it in range(10000000):
             [D_solver, D_loss, tfb_merged],
             feed_dict={real_images: train_image, rand_input: noise(batch_size, noise_dim)}
         )
-        train_writer.add_summary(summary, it)
+        train_writer.add_summary(summary, iterationcounter)
         
 
     # G

@@ -112,13 +112,14 @@ def generator(input_, random_dim,  reuse=False):
 def generatorLayer(act, channels, number):
     conv = tf.layers.conv2d_transpose(act, channels, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
                                        kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                       name=('conv'+str(number)))
+                                       name=('gen_conv'+str(number)))
     bn = tf.contrib.layers.batch_norm(conv, is_training=True, epsilon=1e-5, decay=0.9,
                                        updates_collections=None, scope=('bn'+str(number)))
     act = tf.nn.relu(bn, name=('act'+str(number)))
     return act
 
 
+#Source : https://github.com/llSourcell/Pokemon_GAN/blob/master/pokeGAN.py
 def discriminator(input_, reuse=False):
     c2, c4, c8 = 128, 256, 512  # channel num: 64, 128, 256, 512
     with tf.variable_scope('dis') as scope:
@@ -152,7 +153,7 @@ def discriminator(input_, reuse=False):
 def discLayer(inp,channels,number):
     conv = tf.layers.conv2d(inp, channels, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
                              kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                             name=('conv'+str(number)))
+                             name=('dis_conv'+str(number)))
     bn = tf.contrib.layers.batch_norm(conv, is_training=True, epsilon=1e-5, decay=0.9,
                                        updates_collections=None, scope=('bn'+str(number)))
     act = lrelu(bn, n=('act'+str(number)))
@@ -176,10 +177,9 @@ with tf.name_scope('model1'):
 with tf.name_scope('train'):
     # Loss function
     D_loss = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
+    tf.summary.scalar('D_loss', D_loss)
     G_loss = -tf.reduce_mean(D_fake)
-    tf.summary.scalar('Discriminator Loss', D_loss)
-    tf.summary.scalar('Generator Loss', G_loss)
-
+    tf.summary.scalar('G_loss', G_loss)
     # The variables that need to be trained
     t_vars = tf.trainable_variables()
     d_vars = [var for var in t_vars if 'dis' in var.name]
@@ -210,10 +210,6 @@ def getlastmodel():
 #Starting Session
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
-
-merged = tf.summary.merge_all()
-writer = tf.summary.FileWriter("./logs",sess.graph)
-
 with sess.as_default():
     # Create folders we're going to use:
     if not os.path.exists('out/'):
@@ -236,35 +232,37 @@ image_batch, samples_num = process_data()
 print(samples_num)
 coord = tf.train.Coordinator()
 threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-train_writer = tf.summary.FileWriter( './logs/1/train ', sess.graph)
-
+tfb_merged = tf.summary.merge_all()
+train_writer = tf.summary.FileWriter('log/', sess.graph)
 
 # The main loop:
 for it in range(10000000):
+    print("It: " + str(it))
     # Train Discriminator five times as much as the Generator
     for _ in range(5):
         train_image = sess.run(image_batch)
 
         # D
-        _, D_loss_curr, _ = sess.run(
-            [D_solver, D_loss, clip_D],
+        _, D_loss_curr, summary = sess.run(
+            [D_solver, D_loss, tfb_merged],
             feed_dict={real_images: train_image, rand_input: noise(batch_size, noise_dim)}
         )
-        tf.summary.histogram("D_loss", D_loss_curr)
-    
+        train_writer.add_summary(summary, it)
+        
+
     # G
     _, G_loss_curr = sess.run(
         [G_solver, G_loss],
         feed_dict={rand_input: noise(batch_size, noise_dim)}
     )
-    tf.summary.histogram("G_loss", G_loss_curr)
+    train_writer.add_summary(summary, it)
 
     if it % 100 == 0 and it != 0:
         iterationcounter += 100
         # Print current Loss
         print('Iter: {}; D_loss: {:.4}; G_loss: {:.4}'.format(iterationcounter, D_loss_curr, G_loss_curr))
-        summary = sess.run([merged], feed_dict={real_images: train_image, rand_input: noise(1, noise_dim)})
-        writer.add_summary(summary, iterationcounter)
+
+        tf.summary.merge_all()
 
         if it % 100 == 0:
             # Draw samples
@@ -275,4 +273,4 @@ for it in range(10000000):
 
             # Save Model
             save_path = saver.save(sess, "./models/model_%s.ckpt" % iterationcounter)
-            print("Model saved in file: %s" % save_path)
+print("Model saved in file: %s" % save_path)

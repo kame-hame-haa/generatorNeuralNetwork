@@ -187,7 +187,7 @@ with tf.name_scope('train'):
 
     # The actual training
     D_solver = (tf.train.RMSPropOptimizer(learning_rate=2e-4)
-                .minimize(-D_loss, var_list=d_vars))
+                .minimize(-D_loss, var_list=d_vars)) # RMSProp ist besser geignet fuer batches
     G_solver = (tf.train.RMSPropOptimizer(learning_rate=2e-4)
                 .minimize(G_loss, var_list=g_vars))
 

@@ -10,9 +10,8 @@ WIDTH = 64
 batch_size = 32
 image_dim = HEIGHT * WIDTH * CHANNEL
 noise_dim = 100
-h_dim = 128
 
-data_directory = "./ourDataset/filter"
+data_directory = "./ourDataset/all"
 
 # Reading in the pictures
 def process_data():
@@ -48,7 +47,7 @@ def process_data():
 
 # drawing the generated images
 def plot(samples):
-    fig = plt.figure(figsize=(4, 4))
+    figure = plt.figure(figsize=(4, 4))
     gs = gridspec.GridSpec(4, 4)
     gs.update(wspace=0.05, hspace=0.05)
 
@@ -63,7 +62,7 @@ def plot(samples):
         else:
             plt.imshow(sample.reshape(WIDTH, HEIGHT, CHANNEL), interpolation="none")
 
-    return fig
+    return figure
 
 
 # normalisiert erstellte Matrizen; besser als 0 - Matrizen
@@ -83,8 +82,7 @@ def noise(m, n):
 def lrelu(x, n, leak=0.2):
     return tf.maximum(x, leak * x, name=n)
 
-#Source : https://github.com/llSourcell/Pokemon_GAN/blob/master/pokeGAN.py
-def generator(input, random_dim,  reuse=False):
+def generator(input_, random_dim,  reuse=False):
     c4, c8, c16 = 512, 256, 128  # channel num
     s4 = 8
     output_dim = CHANNEL  # RGB image
@@ -95,7 +93,7 @@ def generator(input, random_dim,  reuse=False):
                              initializer=tf.truncated_normal_initializer(stddev=0.02))
         b1 = tf.get_variable('b1', shape=[c4 * s4 * s4], dtype=tf.float32,
                              initializer=tf.constant_initializer(0.0))
-        flat_conv1 = tf.add(tf.matmul(input, w1), b1, name='flat_conv1')
+        flat_conv1 = tf.add(tf.matmul(input_, w1), b1, name='flat_conv1')
         # 8*8*512
         # Convolution, bias, activation, repeat!
         conv1 = tf.reshape(flat_conv1, shape=[-1, s4, s4, c4], name='conv1')
@@ -103,64 +101,41 @@ def generator(input, random_dim,  reuse=False):
                                            updates_collections=None, scope='bn1')
         act1 = tf.nn.relu(bn1, name='act1')
         # 16*16*256
-        # Convolution, bias, activation, repeat!
-        conv2 = tf.layers.conv2d_transpose(act1, c8, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
-                                           kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                           name='conv2')
-        bn2 = tf.contrib.layers.batch_norm(conv2, is_training=True, epsilon=1e-5, decay=0.9,
-                                           updates_collections=None, scope='bn2')
-        act2 = tf.nn.relu(bn2, name='act2')
+        act2 = generatorLayer(act1,c8,2)
         # 32*32*128
-        conv3 = tf.layers.conv2d_transpose(act2, c16, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
-                                           kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                           name='conv3')
-        bn3 = tf.contrib.layers.batch_norm(conv3, is_training=True, epsilon=1e-5, decay=0.9,
-                                           updates_collections=None, scope='bn3')
-        act3 = tf.nn.relu(bn3, name='act3')
-
+        act3 = generatorLayer(act2, c16, 3)
         # 64*64*3
-        conv4 = tf.layers.conv2d_transpose(act3, output_dim, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
-                                           kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                           name='conv4')
-        #bn5 = tf.contrib.layers.batch_norm(conv5, is_training=True, epsilon=1e-5, decay = 0.9,  updates_collections=None, scope='bn5')
-        act4 = tf.nn.sigmoid(conv4, name='act4')
+        act4 = generatorLayer(act3, output_dim, 4)
         return act4
 
+# Convolution, bias, activation
+def generatorLayer(act, channels, number):
+    conv = tf.layers.conv2d_transpose(act, channels, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
+                                       kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
+                                       name=('conv'+str(number)))
+    bn = tf.contrib.layers.batch_norm(conv, is_training=True, epsilon=1e-5, decay=0.9,
+                                       updates_collections=None, scope=('bn'+str(number)))
+    act = tf.nn.relu(bn, name=('act'+str(number)))
+    return act
 
 
 #Source : https://github.com/llSourcell/Pokemon_GAN/blob/master/pokeGAN.py
-def discriminator(input, reuse=False):
+def discriminator(input_, reuse=False):
     c2, c4, c8 = 128, 256, 512  # channel num: 64, 128, 256, 512
     with tf.variable_scope('dis') as scope:
         if reuse:
             scope.reuse_variables()
 
         #Reshape
-        input = tf.reshape(input,[-1,WIDTH,HEIGHT,CHANNEL])
-        # Convolution, activation, bias, repeat!
-        conv1 = tf.layers.conv2d(input, c2, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
-                                 kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                 name='conv1')
-        bn1 = tf.contrib.layers.batch_norm(conv1, is_training=True, epsilon=1e-5, decay=0.9,
-                                           updates_collections=None, scope='bn1')
-        act1 = lrelu(bn1, n='act1')
-        # Convolution, activation, bias, repeat!
-        conv2 = tf.layers.conv2d(act1, c4, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
-                                 kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                 name='conv2')
-        bn2 = tf.contrib.layers.batch_norm(conv2, is_training=True, epsilon=1e-5, decay=0.9,
-                                           updates_collections=None, scope='bn2')
-        act2 = lrelu(bn2, n='act2')
-        # Convolution, activation, bias, repeat!
-        conv3 = tf.layers.conv2d(act2, c8, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
-                                 kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
-                                 name='conv3')
-        bn3 = tf.contrib.layers.batch_norm(conv3, is_training=True, epsilon=1e-5, decay=0.9,
-                                           updates_collections=None, scope='bn3')
-        act3 = lrelu(bn3, n='act3')
+        input_ = tf.reshape(input_,[-1,WIDTH,HEIGHT,CHANNEL])
+        # Layer 1
+        act1 = discLayer(input_,c2,1)
+        # Layer 2
+        act2 = discLayer(act1,c4,2)
+        # Layer 3
+        act3 = discLayer(act2,c8,3)
 
-
-        # start from act4
+        # start from act3
         dim = int(np.prod(act3.get_shape()[1:]))
         fc1 = tf.reshape(act3, shape=[-1, dim], name='fc1')
 
@@ -171,38 +146,30 @@ def discriminator(input, reuse=False):
 
         # wgan just get rid of the sigmoid
         logits = tf.add(tf.matmul(fc1, w2), b2, name='logits')
-        # dcgan
-        acted_out = tf.nn.sigmoid(logits)
-        return logits  # , acted_out
+        return logits
 
 
-# Initialize weights
-
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1)  # normalverteilung
-    return tf.Variable(initial)
-
-
-# initialize biases
-def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+# Convolution, activation, bias
+def discLayer(inp,channels,number):
+    conv = tf.layers.conv2d(inp, channels, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
+                             kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
+                             name=('conv'+str(number)))
+    bn = tf.contrib.layers.batch_norm(conv, is_training=True, epsilon=1e-5, decay=0.9,
+                                       updates_collections=None, scope=('bn'+str(number)))
+    act = lrelu(bn, n=('act'+str(number)))
+    return act
 
 
 with tf.name_scope('model1'):
-    # generator variabeln
-
+    # Placeholder for noise input for generator
     rand_input = tf.placeholder(tf.float32, shape=[None, noise_dim])
-
-
-
+    # Placeholder for our actual images
     real_images = tf.placeholder(tf.float32, shape=[None, HEIGHT, WIDTH, CHANNEL], name='real_image')
 
-    # generator
-
+    # Generator
     G_sample = generator(rand_input,noise_dim)
 
-    # discriminator
+    # Discriminator
     D_real = discriminator(real_images)
     D_fake = discriminator(G_sample, reuse=True)
 
@@ -212,11 +179,12 @@ with tf.name_scope('train'):
     D_loss = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
     G_loss = -tf.reduce_mean(D_fake)
 
-    # discriminator variabeln
+    # The variables that need to be trained
     t_vars = tf.trainable_variables()
     d_vars = [var for var in t_vars if 'dis' in var.name]
     g_vars = [var for var in t_vars if 'gen' in var.name]
 
+    # The actual training
     D_solver = (tf.train.RMSPropOptimizer(learning_rate=2e-4)
                 .minimize(-D_loss, var_list=d_vars))
     G_solver = (tf.train.RMSPropOptimizer(learning_rate=2e-4)
@@ -238,7 +206,7 @@ def getlastmodel():
 
     return "./models/model_%s.ckpt" % iterat, iterat
 
-
+#Starting Session
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 with sess.as_default():
@@ -254,8 +222,7 @@ with sess.as_default():
     if len(os.listdir("./models")) > 0:
         saver.restore(sess, model)
         print("Model restored.")
-        i = iterationcounter
-        print(i)
+        print(iterationcounter)
     else:
         iterationcounter = 0
 
@@ -290,8 +257,8 @@ for it in range(10000000):
 
         if it % 100 == 0:
             # Draw samples
-            samples = sess.run(G_sample, feed_dict={rand_input: noise(16, noise_dim)})
-            fig = plot(samples)
+            drawingsamples = sess.run(G_sample, feed_dict={rand_input: noise(16, noise_dim)})
+            fig = plot(drawingsamples)
             plt.savefig('out/{}.png'.format(str(iterationcounter).zfill(3)), bbox_inches='tight')
             plt.close(fig)
 

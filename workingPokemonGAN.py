@@ -119,7 +119,6 @@ def generatorLayer(act, channels, number):
     return act
 
 
-#Source : https://github.com/llSourcell/Pokemon_GAN/blob/master/pokeGAN.py
 def discriminator(input_, reuse=False):
     c2, c4, c8 = 128, 256, 512  # channel num: 64, 128, 256, 512
     with tf.variable_scope('dis') as scope:
@@ -178,6 +177,8 @@ with tf.name_scope('train'):
     # Loss function
     D_loss = tf.reduce_mean(D_real) - tf.reduce_mean(D_fake)
     G_loss = -tf.reduce_mean(D_fake)
+    tf.summary.scalar('Discriminator Loss', D_loss)
+    tf.summary.scalar('Generator Loss', G_loss)
 
     # The variables that need to be trained
     t_vars = tf.trainable_variables()
@@ -209,6 +210,10 @@ def getlastmodel():
 #Starting Session
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
+
+merged = tf.summary.merge_all()
+writer = tf.summary.FileWriter("./logs",sess.graph)
+
 with sess.as_default():
     # Create folders we're going to use:
     if not os.path.exists('out/'):
@@ -254,6 +259,8 @@ for it in range(10000000):
         iterationcounter += 100
         # Print current Loss
         print('Iter: {}; D_loss: {:.4}; G_loss: {:.4}'.format(iterationcounter, D_loss_curr, G_loss_curr))
+        summary = sess.run([merged], feed_dict={real_images: train_image, rand_input: noise(1, noise_dim)})
+        writer.add_summary(summary, iterationcounter)
 
         if it % 100 == 0:
             # Draw samples

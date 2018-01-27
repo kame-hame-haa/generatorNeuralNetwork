@@ -5,34 +5,32 @@ import matplotlib.gridspec as gridspec
 import os
 from random import randint
 
-mb_size = 32
-dropoutRate = 0.7
 alplr = 0.2
 
 CHANNEL = 3
-HEIGHT = 28
-WIDTH = 28
+HEIGHT = 64
+WIDTH = 64
 
 X_dim = HEIGHT * WIDTH * CHANNEL
-mb_size = 32
-z_dim = 10
+z_dim = 100
 h_dim = 128
 
-data_directory = "C:/Users/Ramtin/OneDrive/Dokumente/Uni/Semester 7/NN/git/generatorNeuralNetwork/ourDataset/all"
+numberOfMorphRows = 2
+numberOfMorphColumns = 8
+
+file = open("log.txt",'a')
+file.write('-----Starting Program------')
+file.flush()
+data_directory = "./ourDataset/3emerald"
 filelist = []
 for s in os.listdir(data_directory):
-    if ".png" in s:
+    if ".jpg" in s:
         filelist.append(data_directory + "/" + s)
-ANZAHLBILDER = len(filelist)
-
-pic_directory = \
-    "C:/Users/Ramtin/OneDrive/Dokumente/Uni/Semester 7/NN/git/generatorNeuralNetwork/ourDataset/all/2crystal (4)"
 
 
 def data(index):
     image_contents = tf.read_file(filelist[index])
-    print(filelist[index])
-    image = tf.image.decode_png(image_contents, channels=3)
+    image = tf.image.decode_jpeg(image_contents, channels=3)
     image = tf.image.resize_images(image, [WIDTH, HEIGHT])
     #image = tf.image.random_flip_left_right(image)
     #image = tf.image.random_brightness(image, max_delta=0.1)
@@ -42,16 +40,18 @@ def data(index):
     return image
 
 
-image16 = []
-for i in range(16):
-    image16.append(tf.reshape(data(i), [-1, X_dim]))
+allImagesList = []
+numberOfImages = len(filelist)
+for i in range(numberOfImages):
+    allImagesList.append(tf.reshape(data(i), [-1, X_dim]))
 
+print("#images: ", numberOfImages)
 current = 0
 
 
 def plot(samples):
     fig = plt.figure(figsize=(40, 40))
-    gs = gridspec.GridSpec(5, 16)
+    gs = gridspec.GridSpec(numberOfMorphRows, numberOfMorphColumns)
     gs.update(wspace=0.05, hspace=0.05)
 
     for i, sample in enumerate(samples):
@@ -77,29 +77,16 @@ def sample_z(m, n):
 
 
 samples_z = []
-for i in range(16):
+for i in range(numberOfImages):
     samples_z.append(sample_z(1, z_dim))
 
 
 # leaky Relu
-
-
 def lrelu(x, alpha):
     return tf.nn.relu(x) - alpha * tf.nn.relu(-x)
 
 
-def next_batch(num):
-    # Return `num` random samples
-    randomnumbers = []
-    for _ in range(num):
-        randomnumbers.append(randint(0, ANZAHLBILDER - 1))
 
-    nextbatch = []
-    for ran in randomnumbers:
-        nextbatch.append(data(ran))
-
-    # Reshaping from shape: (32,#imgs,28,28,3) to (#imgs,(2352)) because 2352 = 28*28*3
-    return tf.reshape(nextbatch, [-1, X_dim])
 
 
 def getlastmodel():
@@ -143,18 +130,22 @@ with tf.name_scope('model1'):
 
         return tf.nn.sigmoid(g_log_prob)
 
+
+G_loss = []
+for i in range(numberOfImages):
+    G_loss.append(tf.square(allImagesList[i] - g_sample(i)))
 with tf.name_scope('train'):
-    G_loss = []
-    for i in range(16):
-        G_loss.append(tf.square(image16[i] - g_sample(i)))
+
+    G_loss[current] = tf.square(allImagesList[current]-g_sample(current))
     G_loss = tf.reduce_sum(G_loss)
 
     G_solver = (tf.train.AdamOptimizer().minimize(G_loss))
 
 
 def morph(first, second, samplesList):
-    for i in range(16):
-        morphVector = (g_sample(first) * i / 15 + g_sample(second) * (1 - i / 15))
+    for i in range(numberOfMorphColumns):
+        morphVector = (g_sample(first) * i / (numberOfMorphColumns-1) +
+                       g_sample(second) * (1 - i / (numberOfMorphColumns-1)))
         samplesList.append(sess.run(morphVector, feed_dict={keepProb: 1.0}))
 
 
@@ -178,28 +169,28 @@ with sess.as_default():
     else:
         iterationcounter = 0
 
-i = 0
-
 for it in range(1000000):
-    for i in range(16):
+    for i in range(numberOfImages):
         current = i
         _, G_loss_curr = sess.run(
             [G_solver, G_loss],
             feed_dict={keepProb: 1.0}
         )
-    if it % 10 == 0 and it != 0:
-        iterationcounter += 100
-        print('Iter: {};  G_loss: {:.4}'.format(str(iterationcounter), G_loss_curr))
+    if it % 1 == 0 and it != 0:
+        iterationcounter += 1
+        log = ('Iter: {};  G_loss: {:.4}'.format(str(iterationcounter), G_loss_curr))
+        print(log)
+        file.write(log)
+        file.flush()
         samples = []
-        morph(3, 4, samples)
-        morph(1, 7, samples)
-        morph(8, 9, samples)
-        morph(10, 13, samples)
-        morph(14, 15, samples)
+        for i in range(numberOfMorphRows):
+            rand1 = randint(0,numberOfImages-1)
+            rand2 = randint(0,numberOfImages-1)
+            morph(rand1, rand2, samples)
 
         fig = plot(samples)
         plt.savefig('outG/{}.png'.format(str(iterationcounter).zfill(3)), bbox_inches='tight')
         plt.close(fig)
-        # if it % 1000 == 0:
-        # save_path = saver.save(sess, "./modelsG/model_%s.ckpt" % iterationcounter)
-        # print("Model saved in file: %s" % save_path)
+        if it %5 == 0:
+            save_path = saver.save(sess, "./modelsG/model_%s.ckpt" % iterationcounter)
+            print("Model saved in file: %s" % save_path)

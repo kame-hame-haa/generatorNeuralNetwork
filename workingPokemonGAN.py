@@ -83,70 +83,76 @@ def lrelu(x, n, leak=0.2):
     return tf.maximum(x, leak * x, name=n)
 
 def generator(input_, random_dim,  reuse=False):
-    c4, c8, c16 = 512, 256, 128  # channel num
-    s4 = 8
+    channel_number1, channel_number2, channel_number3 = 512, 256, 128  # Number of filters we use
+    start = 8 # Size of starting dimension
     output_dim = CHANNEL  # RGB image
     with tf.variable_scope('gen') as scope:
         if reuse:
             scope.reuse_variables()
-        w1 = tf.get_variable('w1', shape=[random_dim, s4 * s4 * c4], dtype=tf.float32,
+        # Weights and biases of Denselayer
+        w1 = tf.get_variable('w1', shape=[random_dim, start * start * channel_number1], dtype=tf.float32,
                              initializer=tf.truncated_normal_initializer(stddev=0.02))
-        b1 = tf.get_variable('b1', shape=[c4 * s4 * s4], dtype=tf.float32,
+        b1 = tf.get_variable('b1', shape=[channel_number1 * start * start], dtype=tf.float32,
                              initializer=tf.constant_initializer(0.0))
-        flat_conv1 = tf.add(tf.matmul(input_, w1), b1, name='flat_conv1')
+        gen_dense = tf.add(tf.matmul(input_, w1), b1, name='gen_dense')
+        # First transposed convolution layer
         # 8*8*512
         # Convolution, bias, activation, repeat!
-        conv1 = tf.reshape(flat_conv1, shape=[-1, s4, s4, c4], name='conv1')
+        conv1 = tf.reshape(gen_dense, shape=[-1, start, start, channel_number1], name='conv1')
         bn1 = tf.contrib.layers.batch_norm(conv1, is_training=True, epsilon=1e-5, decay=0.9,
                                            updates_collections=None, scope='bn1')
         act1 = tf.nn.relu(bn1, name='act1')
+        # Second transposed convolution layer
         # 16*16*256
-        act2 = generatorLayer(act1,c8,2)
+        act2 = generatorLayer(act1,channel_number2,2)
+        # Third transposed convolution layer
         # 32*32*128
-        act3 = generatorLayer(act2, c16, 3)
+        act3 = generatorLayer(act2, channel_number3, 3)
+        # Fourth transposed convolution layer
+        # With Sigmoid instead of
         # 64*64*3
         act4 = generatorLayer(act3, output_dim, 4)
         return act4
 
 # Convolution, bias, activation
-def generatorLayer(act, channels, number):
+def generatorLayer(act, channels, number, last):
     conv = tf.layers.conv2d_transpose(act, channels, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
                                        kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
                                        name=('gen_conv'+str(number)))
     bn = tf.contrib.layers.batch_norm(conv, is_training=True, epsilon=1e-5, decay=0.9,
-                                       updates_collections=None, scope=('bn'+str(number)))
+                                           updates_collections=None, scope=('bn'+str(number)))
     act = tf.nn.relu(bn, name=('act'+str(number)))
     return act
 
 
-#Source : https://github.com/llSourcell/Pokemon_GAN/blob/master/pokeGAN.py
 def discriminator(input_, reuse=False):
-    c2, c4, c8 = 128, 256, 512  # channel num: 64, 128, 256, 512
+    channel_number1, channel_number2, channel_number3 = 128, 256, 512  # Number of filters we use
     with tf.variable_scope('dis') as scope:
         if reuse:
             scope.reuse_variables()
 
-        #Reshape
+        # Reshape
         input_ = tf.reshape(input_,[-1,WIDTH,HEIGHT,CHANNEL])
-        # Layer 1
-        act1 = discLayer(input_,c2,1)
-        # Layer 2
-        act2 = discLayer(act1,c4,2)
-        # Layer 3
-        act3 = discLayer(act2,c8,3)
+        # First Layer of convolution
+        layer1 = discLayer(input_, channel_number1, 1)
+        # Second Layer of convolution
+        layer2 = discLayer(layer1,channel_number2,2)
+        # Third Layer of convoltion
+        layer3 = discLayer(layer2,channel_number3,3)
 
-        # start from act3
-        dim = int(np.prod(act3.get_shape()[1:]))
-        fc1 = tf.reshape(act3, shape=[-1, dim], name='fc1')
+        # Reshape output of layer 3 into 1 dimensional Array
+        dim = int(np.prod(layer3.get_shape()[1:]))
+        vector = tf.reshape(layer3, shape=[-1, dim], name='fc1')
 
-        w2 = tf.get_variable('w2', shape=[fc1.shape[-1], 1], dtype=tf.float32,
+        # Weight and bias of dense layer
+        w2 = tf.get_variable('w2', shape=[vector.shape[-1], 1], dtype=tf.float32,
                              initializer=tf.truncated_normal_initializer(stddev=0.02))
         b2 = tf.get_variable('b2', shape=[1], dtype=tf.float32,
                              initializer=tf.constant_initializer(0.0))
 
-        # wgan just get rid of the sigmoid
-        logits = tf.add(tf.matmul(fc1, w2), b2, name='logits')
-        return logits
+        # Matrixmultiplikation with weights , and adding the biases
+        denseOutput = tf.add(tf.matmul(vector, w2), b2, name='logits')
+        return denseOutput
 
 
 # Convolution, activation, bias
@@ -154,6 +160,7 @@ def discLayer(inp,channels,number):
     conv = tf.layers.conv2d(inp, channels, kernel_size=[5, 5], strides=[2, 2], padding="SAME",
                              kernel_initializer=tf.truncated_normal_initializer(stddev=0.02),
                              name=('dis_conv'+str(number)))
+    # Batch normalization
     bn = tf.contrib.layers.batch_norm(conv, is_training=True, epsilon=1e-5, decay=0.9,
                                        updates_collections=None, scope=('bn'+str(number)))
     act = lrelu(bn, n=('act'+str(number)))

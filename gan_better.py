@@ -62,18 +62,17 @@ def discriminator(x, D_W1, D_W2, D_b1, D_b2):
 
     flattened = tf.reshape(conv1, [-1, 14 * 14 * NUMBER_1CNN])
 
-    # setup some weights and bias values for this layer, then activate with sigmod
+    # setup some weights and bias values for this layer, then activate with lrelu
     # fasst Output von CNN zusammen
     dense_layer1 = tf.matmul(flattened, D_W1) + D_b1
     dense_layer1 = lrelu(dense_layer1, alplr)
 
-    dense_layer2 = tf.matmul(dense_layer1, D_W2) + D_b2
-    out = lrelu(dense_layer2, alplr)
+    out = lrelu(dense_layer1, alplr)
 
     return out
 
 #num_input = 1 wenn es grau sein soll, 3 bei Farben
-def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_shape, stripe, name):
+def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_shape, stride, name):
     # setup the filter input shape for tf.nn.conv_2d
     conv_filt_shape = [filter_shape[0], filter_shape[1], num_input_channels,
                        num_filters]
@@ -84,7 +83,7 @@ def create_new_conv_layer(input_data, num_input_channels, num_filters, filter_sh
     bias = tf.Variable(tf.truncated_normal([num_filters]), name=name + '_b')
 
     # setup the convolutional layer operation
-    conv1 = tf.nn.conv2d(input_data, weights, [1, stripe[0], stripe[1], 1], padding='SAME')
+    conv1 = tf.nn.conv2d(input_data, weights, [1, stride[0], stride[1], 1], padding='SAME')
 
     # add the bias
     conv1 += bias

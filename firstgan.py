@@ -127,13 +127,13 @@ for it in range(1000000):
 
         _, D_loss_curr, summary = sess.run(
             [D_solver, D_loss, tfb_merged],
-            feed_dict={X: X_mb, z: sample_z(mb_size, z_dim), keepProb: 1.0}
+            feed_dict={X: X_mb, z: sample_z(mb_size, z_dim), keepProb: 1.0} # training discriminator
         )
         train_writer.add_summary(summary, it)
 
     _, G_loss_curr = sess.run(
         [G_solver, G_loss],
-        feed_dict={z: sample_z(mb_size, z_dim), keepProb: .7} #prevents overfitting
+        feed_dict={z: sample_z(mb_size, z_dim), keepProb: .7} #prevents overfitting; training generator
     )
     train_writer.add_summary(summary, it)
     if it % 100 == 0:
